@@ -15,6 +15,8 @@ public class GameManager : Singleton<GameManager>
     private Canvas _canvas;
     
     private Constants.GameType _gameType;
+    
+    private MultiplayManager _multiplayManager;
 
     private void Start()
     {
@@ -86,6 +88,31 @@ public class GameManager : Singleton<GameManager>
             
             // Game UI 초기화
             _gameUIController.SetGameUIMode(GameUIController.GameUIMode.Init);
+            
+            // Multiplay Manager 생성
+            _multiplayManager = new MultiplayManager((state, roomId) =>
+            {
+                switch (state)
+                {
+                    case Constants.MultiplayManagerState.CreateRoom:
+                        Debug.Log("## Create Room");
+                        // TODO: 대기 화면 표시
+                        break;
+                    case Constants.MultiplayManagerState.JoinRoom:
+                        Debug.Log("## Join Room");
+                        // 게임 실행
+                        
+                        break;
+                    case Constants.MultiplayManagerState.StartGame:
+                        Debug.Log("## Start Game");
+                        // 대기 화면을 닫고, 게임 실행
+                        
+                        break;
+                    case Constants.MultiplayManagerState.EndGame:
+                        Debug.Log("## End Game");
+                        break;
+                }
+            });
             
             // Game Logic 객체 생성
             var gameLogic = new GameLogic(blockController, _gameType);
