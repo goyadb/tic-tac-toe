@@ -1,4 +1,7 @@
 
+using System;
+using UnityEngine;
+
 public abstract class BasePlayerState
 {
     public abstract void OnEnter(GameLogic gameLogic);
@@ -30,10 +33,23 @@ public class PlayerState : BasePlayerState
     private Constants.PlayerType _playerType;
     private bool _isFirstPlayer;
     
+    private MultiplayManager _multiplayManager;
+    private string _roomId;
+    private bool _isMultiplay;
+    
     public PlayerState(bool isFirstPlayer)
     {
         _isFirstPlayer = isFirstPlayer;
-        _playerType = _isFirstPlayer ? Constants.PlayerType.PlayerA : Constants.PlayerType.PlayerB;    
+        _playerType = _isFirstPlayer ? Constants.PlayerType.PlayerA : Constants.PlayerType.PlayerB;
+        _isMultiplay = false;
+    }
+
+    public PlayerState(bool isFirstPlayer, MultiplayManager multiplayManager, string roomId)
+        : this(isFirstPlayer)
+    {
+        _multiplayManager = multiplayManager;
+        _roomId = roomId;
+        _isMultiplay = true;
     }
     
     public override void OnEnter(GameLogic gameLogic)
@@ -52,6 +68,10 @@ public class PlayerState : BasePlayerState
     public override void HandleMove(GameLogic gameLogic, int row, int col)
     {
         ProcessMove(gameLogic, _playerType, row, col);
+        if (_isMultiplay)
+        {
+            _multiplayManager.SendPlayerMove(_roomId, row * 3 + col);
+        }
     }
 
     protected override void HandleNextTurn(GameLogic gameLogic)
@@ -104,19 +124,32 @@ public class MultiplayState : BasePlayerState
 {
     private Constants.PlayerType _playerType;
     private bool _isFirstPlayer;
+    
+    private MultiplayManager _multiplayManager;
 
-    public MultiplayState(bool isFirstPlayer)
+    public MultiplayState(bool isFirstPlayer, MultiplayManager multiplayManager)
     {
         _isFirstPlayer = isFirstPlayer;
         _playerType = _isFirstPlayer ? Constants.PlayerType.PlayerA : Constants.PlayerType.PlayerB;
+        _multiplayManager = multiplayManager;
     }
     
     public override void OnEnter(GameLogic gameLogic)
     {
+        _multiplayManager.OnOpponentMove = moveData =>
+        {
+            var row = moveData.position / 3;
+            var col = moveData.position % 3;
+            UnityThread.executeInUpdate(() =>
+            {
+                HandleMove(gameLogic, row, col);                
+            });
+        };
     }
 
     public override void OnExit(GameLogic gameLogic)
     {
+        _multiplayManager.OnOpponentMove = null;
     }
 
     public override void HandleMove(GameLogic gameLogic, int row, int col)
@@ -137,7 +170,7 @@ public class MultiplayState : BasePlayerState
     }
 }
 
-public class GameLogic
+public class GameLogic: IDisposable
 {
     public BlockController blockController;
     private Constants.PlayerType[,] _board;
@@ -145,6 +178,9 @@ public class GameLogic
     public BasePlayerState firstPlayerState;      // 첫 번째 턴 상태 객체
     public BasePlayerState secondPlayerState;     // 두 번째 턴 상태 객체
     private BasePlayerState _currentPlayerState;    // 현재 턴 상태 객체
+    
+    private MultiplayManager _multiplayManager;
+    private string _roomId;
     
     public enum GameResult
     {
@@ -168,23 +204,58 @@ public class GameLogic
             {
                 firstPlayerState = new PlayerState(true);
                 secondPlayerState = new AIState();
+
+                // 게임 시작
+                SetState(firstPlayerState);
                 break;
             }
             case Constants.GameType.DualPlayer:
             {
                 firstPlayerState = new PlayerState(true);
                 secondPlayerState = new PlayerState(false);
+                // 게임 시작
+                SetState(firstPlayerState);
                 break;
             }
             case Constants.GameType.MultiPlayer:
             {
-                
+                _multiplayManager = new MultiplayManager((state, roomId) =>
+                {
+                    _roomId = roomId;
+                    switch (state)
+                    {
+                        case Constants.MultiplayManagerState.CreateRoom:
+                            Debug.Log("## Create Room");
+                            // TODO: 대기 화면 표시
+                            // GameManager에게 대기 화면 표시 요청
+                            break;
+                        case Constants.MultiplayManagerState.JoinRoom:
+                            Debug.Log("## Join Room");
+                            firstPlayerState = new MultiplayState(true, _multiplayManager);
+                            secondPlayerState = new PlayerState(false, _multiplayManager, roomId);
+                            // 게임 시작
+                            SetState(firstPlayerState);
+                            break;
+                        case Constants.MultiplayManagerState.StartGame:
+                            Debug.Log("## Start Game");
+                            firstPlayerState = new PlayerState(true, _multiplayManager, roomId);
+                            secondPlayerState = new MultiplayState(false, _multiplayManager);                            
+                            // 게임 시작
+                            SetState(firstPlayerState);
+                            break;
+                        case Constants.MultiplayManagerState.ExitRoom:
+                            Debug.Log("## Exit Room");
+                            // TODO: Exit Room 처리
+                            break;
+                        case Constants.MultiplayManagerState.EndGame:
+                            Debug.Log("## End Game");
+                            // TODO: End Room 처리
+                            break;
+                    }
+                });
                 break;
             }
         }
-        
-        // 게임 시작
-        SetState(firstPlayerState);
     }
 
     public void SetState(BasePlayerState state)
@@ -293,5 +364,11 @@ public class GameLogic
     public Constants.PlayerType[,] GetBoard()
     {
         return _board;
+    }
+
+    public void Dispose()
+    {
+        _multiplayManager?.LeaveRoom(_roomId);
+        _multiplayManager?.Dispose();
     }
 }
