@@ -13,8 +13,8 @@ public class BlockController : MonoBehaviour
         {
             blocks[i].InitMarker(i, blockIndex =>
             {
-                var clickedRow = blockIndex / 3;
-                var clickedCol = blockIndex % 3;
+                var clickedRow = blockIndex / Constants.BlockColumnCount;
+                var clickedCol = blockIndex % Constants.BlockColumnCount;
                 
                 OnBlockClickedDelegate?.Invoke(clickedRow, clickedCol);
             });
@@ -30,7 +30,7 @@ public class BlockController : MonoBehaviour
     public void PlaceMarker(Block.MarkerType markerType, int row, int col)
     {
         // row, col을 index로 변환
-        var markerIndex = row * 3 + col;
+        var markerIndex = row * Constants.BlockColumnCount + col;
         
         // Block에게 마커 표시
         blocks[markerIndex].SetMarker(markerType);
@@ -43,7 +43,7 @@ public class BlockController : MonoBehaviour
 
         foreach (var blockPosition in blockPositions)
         {
-            var blockIndex = blockPosition.row * 3 + blockPosition.col;
+            var blockIndex = blockPosition.row * Constants.BlockColumnCount + blockPosition.col;
             Color32 markerColor;
             if (playerType == Constants.PlayerType.PlayerA)
                 markerColor = new Color32(0, 166, 255, 255);

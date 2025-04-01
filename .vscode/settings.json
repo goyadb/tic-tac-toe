@@ -56,5 +56,6 @@
         "temp/": true,
         "Temp/": true
     },
-    "dotnet.defaultSolution": "tic-tac-toe.sln"
+    "dotnet.defaultSolution": "tic-tac-toe.sln",
+    "dotnet.preferCSharpExtension": true
 }
